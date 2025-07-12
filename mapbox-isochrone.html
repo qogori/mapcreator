@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>增强版Mapbox等时线生成器</title>
+    
+    <!-- 引入Mapbox库 -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f);
+            height: 100vh;
+            color: white;
+            overflow: hidden;
+        }
+        
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        header {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #4285F4, #34A853);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+        }
+        
+        .logo h1 {
+            font-weight: 600;
+            font-size: 1.5rem;
+            background: linear-gradient(to right, #4285F4, #34A853, #EA4335);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        #main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        #map {
+            flex: 1;
+        }
+        
+        .controls-panel {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            overflow-y: auto;
+            color: #333;
+            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 1.25rem;
+            border-bottom: 2px solid #4285F4;
+            padding-bottom: 10px;
+        }
+        
+        .card-title .icon {
+            width: 36px;
+            height: 36px;
+            background: #4285F4;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.1rem;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .search-container {
+            position: relative;
+            margin-bottom: 25px;
+        }
+        
+        #search-box {
+            width: 100%;
+            padding: 15px 15px 15px 45px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        
+        #search-box:focus {
+            border-color: #4285F4;
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+            outline: none;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #777;
+            font-size: 1.1rem;
+        }
+        
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: #f8f9fa;
+            font-size: 1rem;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 1em;
+        }
+        
+        .time-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .time-slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(to right, #4285F4, #34A853, #EA4335);
+        }
+        
+        .time-value {
+            min-width: 65px;
+            height: 40px;
+            background: #4285F4;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        #generate-btn {
+            background: #4285F4;
+        }
+        
+        #generate-btn:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        
+        #clear-btn {
+            background: #EA4335;
+        }
+        
+        #clear-btn:hover {
+            background: #d32a1e;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        
+        .instructions {
+            line-height: 1.7;
+            color: #555;
+            font-size: 0.95rem;
+        }
+        
+        .instructions ul {
+            padding-left: 25px;
+            margin: 20px 0;
+        }
+        
+        .instructions li {
+            margin-bottom: 12px;
+            position: relative;
+            padding-left: 10px;
+        }
+        
+        .instructions li:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4285F4;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 25px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+        
+        .walking-color { background-color: #4285F4; }
+        .cycling-color { background-color: #34A853; }
+        .traffic-color { background-color: #EA4335; }
+        
+        .status-message {
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-weight: 500;
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .loading {
+            background: #e3f2fd;
+            color: #1565C0;
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .marker {
+            background-color: #FF4136;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 4px #FF4136, 0 0 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+        
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            display: none;
+            z-index: 10;
+            position: absolute;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .search-result-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #333;
+        }
+        
+        .search-result-item:hover {
+            background-color: #f1f8ff;
+        }
+        
+        .search-result-item .place-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .search-result-item .place-address {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        footer {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px;
+            text-align: center;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+        }
+        
+        .map-overlay {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 14px 22px;
+            border-radius: 10px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            font-size: 0.95rem;
+            color: #333;
+            display: none;
+        }
+        
+        .token-reminder {
+            background: #FF9800;
+            color: #333;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 25px;
+            display: none;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 100;
+            transition: opacity 0.2s;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">M</div>
+                <h1>Mapbox等时线生成器增强版</h1>
+            </div>
+            <div class="app-desc">
+                <p>位置搜索 + 等时线生成 + 取消功能</p>
+            </div>
+        </header>
+        
+        <div id="main-content">
+            <div id="map"></div>
+            
+            <div class="controls-panel">
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon">🔍</div>
+                        <span>位置搜索</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="search-container">
+                            <div class="search-icon">📍</div>
+                            <input type="text" id="search-box" placeholder="搜索地点（城市、地址或坐标）">
+                            <div id="search-results" class="search-results"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-title">
+                        <div class="icon">⏱</div>
+                        <span>出行设置</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profile-select">出行方式</label>
+                        <select id="profile-select">
+                            <option value="walking">步行</option>
+                            <option value="cycling">骑行</option>
+                            <option value="driving-traffic">公共交通</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="time-range">时间范围（分钟）</label>
+                        <div class="time-container">
+                            <input type="range" id="time-range" class="time-slider" min="5" max="120" value="30">
+                            <div id="time-value" class="time-value">30</div>
+                        </div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button id="generate-btn">生成等时线</button>
+                        <button id="clear-btn">清除等时线</button>
+                    </div>
+                    
+                    <div id="status" class="status-message">
+                        <!-- 状态消息显示区域 -->
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon">📖</div>
+                        <span>使用说明</span>
+                    </div>
+                    <div class="instructions">
+                        <ul>
+                            <li>在搜索框输入地址后从下拉结果中选择</li>
+                            <li>点击地图上的位置设置起点</li>
+                            <li>选择出行方式和时间范围</li>
+                            <li>点击"生成等时线"按钮（或地图点击自动生成）</li>
+                            <li>"清除等时线"按钮可以重置当前结果</li>
+                            <li>地图右下角可查看出行时间信息</li>
+                        </ul>
+                        
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-color walking-color"></div>
+                                <span>步行</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color cycling-color"></div>
+                                <span>骑行</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color traffic-color"></div>
+                                <span>公共交通</span>
+                            </div>
+                        </div>
+                        
+                        <div class="token-reminder" id="token-reminder">
+                            重要: 请替换代码中的Mapbox访问令牌！
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map-overlay" class="map-overlay">
+            点击地图上任意位置设置起点
+        </div>
+        
+        <footer>
+            <div>© 2023 Mapbox等时线生成器</div>
+            <div>使用Mapbox GL JS和Isochrone API</div>
+            <div>增强功能：位置搜索 + 清除等时线</div>
+        </footer>
+    </div>
+    
+    <!-- 信息提示工具 -->
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        // ************** 重要提示 **************
+        // 将下面的字符串替换为您的Mapbox访问令牌
+        const ACCESS_TOKEN = 'pk.eyJ1IjoicW9nb3JpIiwiYSI6IkNpTG9jVjQifQ.Z4wOyxN0z9hZe9l6Nt6ohg';
+        // ************************************
+        
+        // 全局变量
+        let map;
+        let marker = null;
+        let currentPoint = null;
+        let isochroneActive = false;
+        
+        // 不同出行方式的颜色映射
+        const COLOR_MAP = {
+            'walking': '#4285F4',
+            'cycling': '#34A853',
+            'driving-traffic': '#EA4335'
+        };
+        
+        // DOM元素引用
+        const timeRange = document.getElementById('time-range');
+        const timeValue = document.getElementById('time-value');
+        const profileSelect = document.getElementById('profile-select');
+        const searchBox = document.getElementById('search-box');
+        const searchResults = document.getElementById('search-results');
+        const statusDiv = document.getElementById('status');
+        const generateBtn = document.getElementById('generate-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const mapOverlay = document.getElementById('map-overlay');
+        const tokenReminder = document.getElementById('token-reminder');
+        const tooltip = document.getElementById('tooltip');
+        
+        // 初始化地图
+        function initMap() {
+            mapboxgl.accessToken = ACCESS_TOKEN;
+            
+            // 检测令牌是否已替换
+            if (ACCESS_TOKEN.includes('REPLACE')) {
+                showTokenReminder();
+                return;
+            }
+            
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [116.4074, 39.9042], // 北京市中心
+                zoom: 11,
+                attributionControl: false
+            });
+            
+            // 添加地图控件
+            map.addControl(new mapboxgl.NavigationControl());
+            map.addControl(new mapboxgl.ScaleControl({
+                maxWidth: 100,
+                unit: 'metric'
+            }));
+            
+            // 地图加载完成后添加事件
+            map.on('load', () => {
+                // 显示初始提示
+                showStatus('点击地图开始创建等时线', 'loading');
+                mapOverlay.style.display = 'block';
+                
+                // 添加点击事件
+                map.on('click', handleMapClick);
+                
+                // 鼠标移动显示坐标信息
+                map.on('mousemove', (e) => {
+                    const {lng, lat} = e.lngLat;
+                    tooltip.innerHTML = `经度: ${lng.toFixed(5)}<br>纬度: ${lat.toFixed(5)}`;
+                    tooltip.style.opacity = '1';
+                    tooltip.style.left = `${e.point.x + 15}px`;
+                    tooltip.style.top = `${e.point.y}px`;
+                });
+                
+                map.on('mouseout', () => {
+                    tooltip.style.opacity = '0';
+                });
+            });
+        }
+        
+        // 地图点击事件处理
+        function handleMapClick(e) {
+            createMarker(e.lngLat);
+            generateIsochrone(e.lngLat);
+        }
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 时间滑块事件
+            timeRange.addEventListener('input', function() {
+                timeValue.textContent = this.value;
+            });
+            
+            // 出行方式选择事件
+            profileSelect.addEventListener('change', function() {
+                if (isochroneActive) {
+                    generateIsochrone(currentPoint);
+                }
+            });
+            
+            // 生成按钮事件
+            generateBtn.addEventListener('click', function() {
+                if (currentPoint) {
+                    generateIsochrone(currentPoint);
+                } else {
+                    showStatus('请先选择位置', 'error');
+                }
+            });
+            
+            // 清除按钮事件
+            clearBtn.addEventListener('click', clearIsochrone);
+            
+            // 搜索框功能
+            searchBox.addEventListener('input', handleSearchInput);
+            searchBox.addEventListener('focus', function() {
+                if (this.value) {
+                    handleSearchInput();
+                }
+            });
+            
+            // 防止搜索框回车提交
+            searchBox.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') e.preventDefault();
+            });
+        }
+        
+        // 创建标记
+        function createMarker(lngLat) {
+            if (marker) {
+                marker.remove();
+            }
+            
+            const el = document.createElement('div');
+            el.className = 'marker';
+            
+            marker = new mapboxgl.Marker(el)
+                .setLngLat(lngLat)
+                .addTo(map);
+            
+            currentPoint = lngLat;
+            mapOverlay.style.display = 'none';
+            isochroneActive = true;
+        }
+        
+        // 生成等时线
+        function generateIsochrone(lngLat) {
+            const minutes = parseInt(timeRange.value);
+            const profile = profileSelect.value;
+            
+            // 显示加载状态
+            showStatus(`正在计算${minutes}分钟${getProfileName(profile)}等时线...`, 'loading');
+            
+            // 构建API URL
+            const url = `https://api.mapbox.com/isochrone/v1/mapbox/${profile}/${lngLat.lng},${lngLat.lat}?contours_minutes=${minutes}&polygons=true&access_token=${ACCESS_TOKEN}`;
+            
+            // 调用API获取等时线数据
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`API请求失败: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.features && data.features.length > 0) {
+                        addIsochroneToMap(data);
+                        showStatus('等时线生成成功！', 'success');
+                        
+                        // 3秒后自动隐藏成功消息
+                        setTimeout(() => {
+                            statusDiv.style.display = 'none';
+                        }, 3000);
+                    } else {
+                        showStatus('该位置无法生成等时线，请尝试其他位置', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('等时线生成错误:', error);
+                    showStatus(`错误: ${error.message}`, 'error');
+                });
+        }
+        
+        // 添加等时线到地图
+        function addIsochroneToMap(data) {
+            // 清除之前的等时线图层
+            clearLayers();
+            
+            // 添加数据源
+            map.addSource('isochrone', {
+                type: 'geojson',
+                data: data
+            });
+            
+            // 获取当前出行方式颜色
+            const profile = profileSelect.value;
+            const fillColor = COLOR_MAP[profile];
+            
+            // 添加填充图层
+            map.addLayer({
+                id: 'isochrone-layer',
+                type: 'fill',
+                source: 'isochrone',
+                layout: {},
+                paint: {
+                    'fill-color': fillColor,
+                    'fill-opacity': 0.45
+                }
+            });
+            
+            // 添加标签图层
+            map.addLayer({
+                id: 'isochrone-labels',
+                type: 'symbol',
+                source: 'isochrone',
+                layout: {
+                    'text-field': '{contour}分钟',
+                    'text-size': 14,
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-allow-overlap': true
+                },
+                paint: {
+                    'text-color': '#ffffff',
+                    'text-halo-color': fillColor,
+                    'text-halo-width': 2
+                }
+            });
+            
+            // 调整地图视角
+            map.flyTo({
+                center: [currentPoint.lng, currentPoint.lat],
+                zoom: 13,
+                speed: 0.8,
+                curve: 1.2
+            });
+            
+            isochroneActive = true;
+        }
+        
+        // 清除等时线和标记
+        function clearIsochrone() {
+            clearLayers();
+            
+            if (marker) {
+                marker.remove();
+                marker = null;
+            }
+            
+            currentPoint = null;
+            isochroneActive = false;
+            searchResults.style.display = 'none';
+            mapOverlay.style.display = 'block';
+            
+            showStatus('已清除等时线和标记', 'success');
+            
+            // 2秒后隐藏消息
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 2000);
+        }
+        
+        // 清除所有图层
+        function clearLayers() {
+            if (map.getLayer('isochrone-layer')) map.removeLayer('isochrone-layer');
+            if (map.getLayer('isochrone-labels')) map.removeLayer('isochrone-labels');
+            if (map.getSource('isochrone')) map.removeSource('isochrone');
+        }
+        
+        // 处理搜索输入
+        function handleSearchInput() {
+            const query = searchBox.value.trim();
+            if (query.length < 2) {
+                searchResults.style.display = 'none';
+                return;
+            }
+            
+            // 使用Mapbox地理编码API
+            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${ACCESS_TOKEN}`)
+                .then(response => response.json())
+                .then(data => {
+                    displaySearchResults(data.features);
+                })
+                .catch(error => {
+                    console.error('搜索失败:', error);
+                });
+        }
+        
+        // 显示搜索结果
+        function displaySearchResults(features) {
+            searchResults.innerHTML = '';
+            
+            if (features.length === 0) {
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+                item.textContent = '未找到匹配结果';
+                searchResults.appendChild(item);
+            } else {
+                features.slice(0, 8).forEach(feature => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    
+                    // 确保数据中存在place_name属性
+                    const placeName = feature.place_name || '未知地点';
+                    
+                    item.innerHTML = `
+                        <div class="place-name">${placeName}</div>
+                        <div class="place-address">${feature.text || ''}</div>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        searchBox.value = placeName;
+                        searchResults.style.display = 'none';
+                        
+                        // 移动地图到选定位置
+                        const [lng, lat] = feature.center;
+                        map.flyTo({
+                            center: [lng, lat],
+                            zoom: 14,
+                            essential: true
+                        });
+                        
+                        // 设置标记
+                        createMarker({ lng, lat });
+                        
+                        // 如果之前已经生成了等时线，重新生成
+                        if (isochroneActive) {
+                            setTimeout(() => {
+                                generateIsochrone({ lng, lat });
+                            }, 1000);
+                        }
+                    });
+                    
+                    searchResults.appendChild(item);
+                });
+            }
+            
+            searchResults.style.display = 'block';
+        }
+        
+        // 更新状态消息
+        function showStatus(message, type = 'loading') {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+        }
+        
+        // 显示令牌提醒
+        function showTokenReminder() {
+            tokenReminder.style.display = 'block';
+            showStatus('请替换代码中的Mapbox访问令牌', 'error');
+        }
+        
+        // 获取出行方式名称
+        function getProfileName(profile) {
+            const names = {
+                'walking': '步行',
+                'cycling': '骑行',
+                'driving-traffic': '公共交通'
+            };
+            return names[profile] || profile;
+        }
+        
+        // 初始化应用
+        function initApp() {
+            setupEventListeners();
+            
+            try {
+                initMap();
+            } catch (e) {
+                document.body.innerHTML = `
+                    <div style="padding: 30px; text-align: center; color: white;">
+                        <h1>初始化失败</h1>
+                        <p>${e.message}</p>
+                        <p>请确保提供了有效的Mapbox访问令牌</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 页面加载完成后初始化应用
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
